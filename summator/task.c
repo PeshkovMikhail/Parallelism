@@ -22,6 +22,7 @@ int main() {
 	printf("%f\n", (float)(clock() - start)/CLOCKS_PER_SEC);
 
 	printf("%.32lf\n", sum);
+#pragma acc exit data delete(arr)
 	free(arr);
 	//free(arr_d);
 	return 0;

@@ -28,7 +28,7 @@ void args_parser(int argc, char* argv[], double& acc, size_t& netSize, size_t& i
 				switch (j)
 				{
 				case 0:
-					acc = std::max(val, std::pow(10, -6));
+					acc = val;
 					break;
 				case 1:
 					netSize = val;
@@ -38,13 +38,14 @@ void args_parser(int argc, char* argv[], double& acc, size_t& netSize, size_t& i
 					}
 					break;
 				case 2:
-					itCount = std::min(val, std::pow(10, 6));
+					itCount = val;
 					if (val < 0) {
 						std::cerr << "itCount can't be < 0" << std::endl;
 						exit(1);
 					}
 					break;
 				default:
+					std::cout << "unexpected option " << args[i] << "\n"; 
 					break;
 				}
 				continue;
@@ -73,18 +74,21 @@ int main(int argc, char* argv[]) {
     double* A = new double[size];
 	double* Anew = new double[size];
 
-	memset(A, 0, sizeof(double)*size);
+	memset(A, 0, sizeof(double)*size); //most values at init step should be zero
 
+	//set values to corners
 	A[0] = 10;
 	A[netSize - 1] = 20;
 	A[netSize*(netSize - 1)] = 30;
 	A[netSize*netSize-1] = 20;
 
-	double hor_top_step = (A[netSize - 1] - A[0]) / (netSize - 1);
+	//linear interpolation steps
+	double hor_top_step = (A[netSize - 1] - A[0]) / (netSize - 1); 
 	double hor_down_step = (A[netSize*netSize - 1] - A[netSize*(netSize-1)]) / (netSize - 1);
 	double ver_left_step = (A[netSize * (netSize - 1)] - A[0]) / (netSize - 1);
 	double ver_right_step = (A[netSize*netSize-1] - A[netSize-1]) / (netSize - 1);
 
+	// set values to sides
 	for(int i = 1; i < netSize - 1; i++) {
 		A[i] = 10 + hor_top_step*i;
 		A[netSize*i] = 10 + ver_left_step*i;
@@ -92,13 +96,13 @@ int main(int argc, char* argv[]) {
 		A[netSize*(netSize-1) + i] = 30 + hor_down_step*i;
 	}
 
-	memcpy(Anew, A, sizeof(double)*size);
+	memcpy(Anew, A, sizeof(double)*size); // copy corners and sides to Anew
 
 	#pragma acc data copyin(A[:size], Anew[:size])
 	{
 		for(itCount = 0; itCount < itCountMax; itCount++)
 		{
-			#pragma acc data present(A[:size], Anew[:size])
+			#pragma acc data present(A[:size], Anew[:size]) // update pointers on gpu
 			#pragma acc parallel loop 
 			for(int y = 1; y < netSize - 1; y++) {
 				#pragma acc loop
@@ -107,7 +111,7 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if(itCount%100 == 0 || itCount + 1 == itCountMax) {
+			if(itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
 				loss = 0;
 				#pragma acc data copy(loss)
 				#pragma acc parallel loop reduction(max:loss)
@@ -118,13 +122,17 @@ int main(int argc, char* argv[]) {
 					}
 				}
 				
-				if(loss <= accuracy)
+				if(loss <= accuracy) // finish calc if needed accuracy reached
 					break;
 			}
-			std::swap(A, Anew);
+			std::swap(A, Anew); // swap pointers on cpu
 		}
 	}
 
 	std::cout << loss << '\n';
 	std::cout << itCount << '\n';
+	#pragma acc exit data delete(A[:size], Anew[:size])
+	delete[] A;
+	delete[] Anew;
+	return 0;
 }

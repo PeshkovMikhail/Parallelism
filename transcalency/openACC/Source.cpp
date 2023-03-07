@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
 			#pragma acc parallel loop reduction(max:loss)
 			for( int i = 0; i < size; i++ )
 			{
-				loss =  fmax(loss,fabs(web[i] - webPrev[i]));
+				loss = fmax(loss,fabs(web[i] - webPrev[i]));
 			}
 
 			if (accuracy >= loss)

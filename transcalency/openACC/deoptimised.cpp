@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cmath>
 #include <assert.h>
+#include <openacc.h>
 
 void args_parser(int argc, char* argv[], double& acc, size_t& netSize, size_t& itCount) {
 	if (argc < 4) {
@@ -65,6 +66,7 @@ int main(int argc, char* argv[]) {
 	double accuracy;
 	size_t netSize=0, itCountMax;
 	args_parser(argc, argv, accuracy, netSize, itCountMax);
+	acc_set_device_num( 2, acc_device_nvidia );
 
 	double loss = 0;
 	int itCount = 0;
@@ -101,7 +103,7 @@ int main(int argc, char* argv[]) {
 
 		for(itCount = 0; itCount < itCountMax; itCount++)
 		{
-			//#pragma acc data present(A[:size], Anew[:size]) // update pointers on gpu
+			#pragma acc data present(A[:size], Anew[:size]) // update pointers on gpu
 			#pragma acc parallel loop 
 			for(int y = 1; y < netSize - 1; y++) {
 				#pragma acc loop
@@ -112,22 +114,19 @@ int main(int argc, char* argv[]) {
 
 			if(itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
 				loss = 0;
-				//#pragma acc data copy(loss)
-				//#pragma acc parallel loop reduction(max:loss)
+				#pragma acc data copy(loss)
+				#pragma acc parallel loop reduction(max:loss)
 				for(int y = 1; y < netSize - 1; y++) {
-					//#pragma acc loop reduction(max:loss)
+					#pragma acc loop reduction(max:loss)
 					for(int x = 1; x < netSize - 1; x++) {
 						loss = std::fmax(loss, std::fabs(Anew[y*netSize+x] - A[y*netSize + x]));
-                        
 					}
 				}
+				
 				if(loss <= accuracy) // finish calc if needed accuracy reached
 					break;
 			}
-			//std::swap(A, Anew); // swap pointers on cpu
-            #pragma acc parallel loop
-            for(int i = 0; i < size; i++)
-                A[i] = Anew[i];
+			std::swap(A, Anew); // swap pointers on cpu
 		}
 	}
 

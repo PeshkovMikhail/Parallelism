@@ -110,11 +110,10 @@ int main(int argc, char* argv[]) {
 				}
 			}
 
-			if(true || itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
+			if(itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
 				loss = 0;
 				//#pragma acc data copy(loss)
 				//#pragma acc parallel loop reduction(max:loss)
-                #pragma acc update host(Anew[:size], A[:size])
 				for(int y = 1; y < netSize - 1; y++) {
 					//#pragma acc loop reduction(max:loss)
 					for(int x = 1; x < netSize - 1; x++) {
@@ -126,11 +125,9 @@ int main(int argc, char* argv[]) {
 					break;
 			}
 			//std::swap(A, Anew); // swap pointers on cpu
-            //#pragma acc parallel loop
-            #pragma acc update host(Anew[:size], A[:size])
+            #pragma acc parallel loop
             for(int i = 0; i < size; i++)
                 A[i] = Anew[i];
-            #pragma acc update device(Anew[:size], A[:size])
 		}
 	}
 

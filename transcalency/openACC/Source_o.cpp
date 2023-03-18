@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cmath>
 #include <assert.h>
+#include <cublas_v2.h>
 
 void args_parser(int argc, char* argv[], double& acc, size_t& netSize, size_t& itCount) {
 	if (argc < 4) {
@@ -73,6 +74,7 @@ int main(int argc, char* argv[]) {
     
     double* A = new double[size];
 	double* Anew = new double[size];
+	double* Delta = new double[size];
 
 	memset(A, 0, sizeof(double)*size); //most values at init step should be zero
 
@@ -97,8 +99,9 @@ int main(int argc, char* argv[]) {
 	}
 
 	memcpy(Anew, A, sizeof(double)*size); // copy corners and sides to Anew
-
-	#pragma acc data copyin(A[:size], Anew[:size])
+	cublasHandle_t handle;
+	cublasCreate(&handle);
+	#pragma acc data copyin(A[:size], Anew[:size], Delta[:size])
 	{
 		for(itCount = 0; itCount < itCountMax; itCount++)
 		{
@@ -113,14 +116,35 @@ int main(int argc, char* argv[]) {
 
 			if(itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
 				loss = 0;
-				#pragma acc data copy(loss)
-				#pragma acc parallel loop reduction(max:loss)
-				for(int y = 1; y < netSize - 1; y++) {
-					#pragma acc loop reduction(max:loss)
-					for(int x = 1; x < netSize - 1; x++) {
-						loss = std::fmax(loss, std::fabs(Anew[y*netSize+x] - A[y*netSize + x]));
-					}
+				//#pragma acc data copy(loss)
+				// #pragma acc parallel loop reduction(max:loss)
+				// for(int y = 1; y < netSize - 1; y++) {
+				// 	#pragma acc loop reduction(max:loss)
+				// 	for(int x = 1; x < netSize - 1; x++) {
+				// 		loss = std::fmax(loss, std::fabs(Anew[y*netSize+x] - A[y*netSize + x]));
+				// 	}
+				// }
+
+				
+				double a = -1;
+				int id = 0;
+				
+				cublasStatus_t res1, res2, res3;
+				#pragma acc host_data use_device(A, Anew, Delta)
+				{
+					res1 = cublasDcopy(handle, size, Anew, 1, Delta, 1);
+					res2 = cublasDaxpy(handle, size, &a, A, 1, Delta, 1);
+					res3 = cublasIdamax(handle, size, Delta, 1, &id);
 				}
+
+				// if(res1 != CUBLAS_STATUS_SUCCESS)
+				// 	return 1;
+				// if(res2 != CUBLAS_STATUS_SUCCESS)
+				// 	return 1;
+				// if(res3 != CUBLAS_STATUS_SUCCESS)
+				// 	return 1;
+				#pragma acc update host(Delta[id])	
+				loss = std::abs(Delta[id]);
 				
 				if(loss <= accuracy) // finish calc if needed accuracy reached
 					break;
@@ -128,11 +152,12 @@ int main(int argc, char* argv[]) {
 			std::swap(A, Anew); // swap pointers on cpu
 		}
 	}
-
+	cublasDestroy(handle);
 	std::cout << loss << '\n';
 	std::cout << itCount << '\n';
-	#pragma acc exit data delete(A[:size], Anew[:size])
+	#pragma acc exit data delete(A[:size], Anew[:size], Delta[:size])
 	delete[] A;
 	delete[] Anew;
+	delete[] Delta;
 	return 0;
 }

@@ -137,12 +137,12 @@ int main(int argc, char* argv[]) {
 					res3 = cublasIdamax(handle, size, Delta, 1, &id);
 				}
 
-				// if(res1 != CUBLAS_STATUS_SUCCESS)
-				// 	return 1;
-				// if(res2 != CUBLAS_STATUS_SUCCESS)
-				// 	return 1;
-				// if(res3 != CUBLAS_STATUS_SUCCESS)
-				// 	return 1;
+				if(res1 != CUBLAS_STATUS_SUCCESS)
+					exit(EXIT_FAILURE);
+				if(res2 != CUBLAS_STATUS_SUCCESS)
+					exit(EXIT_FAILURE);
+				if(res3 != CUBLAS_STATUS_SUCCESS)
+					exit(EXIT_FAILURE);
 				#pragma acc update host(Delta[id])	
 				loss = std::abs(Delta[id]);
 				

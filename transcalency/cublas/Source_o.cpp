@@ -143,8 +143,8 @@ int main(int argc, char* argv[]) {
 					exit(EXIT_FAILURE);
 				if(res3 != CUBLAS_STATUS_SUCCESS)
 					exit(EXIT_FAILURE);
-				#pragma acc update host(Delta[id])	
-				loss = std::abs(Delta[id]);
+				#pragma acc update host(Delta[id-1])	
+				loss = std::abs(Delta[id-1]);
 				
 				if(loss <= accuracy) // finish calc if needed accuracy reached
 					break;

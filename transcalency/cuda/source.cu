@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
     double accuracy;
     size_t netSize=0, itCountMax;
     args_parser(argc, argv, accuracy, netSize, itCountMax);
-
+    
     double loss = 0;
     int itCount;
 
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
     cudaMalloc((void**)&A, sizeof(double)*size);
     cudaMalloc((void**)&Anew, sizeof(double)*size);
     cudaMalloc((void**)&Delta, sizeof(double)*size);
-
+    catchFailure("alloc");
     cudaMemset(A, 0, sizeof(double)*size);
 
     //linear interpolation steps
@@ -122,13 +122,19 @@ int main(int argc, char* argv[]) {
     double ver_right_step = (double)(20 - 20) / (double)(netSize - 1);
 
     // set values to sides
-    fillEdges<<<1, netSize>>>(A, netSize, hor_top_step, hor_down_step, ver_left_step, ver_right_step);
+    unsigned int block = netSize/32;
+    if(netSize % 32 != 0)
+        block+=1;
+    fillEdges<<<block, 32>>>(A, netSize, hor_top_step, hor_down_step, ver_left_step, ver_right_step);
     catchFailure("fill edges");
     cudaMemcpy(Anew, A, sizeof(double)*size, cudaMemcpyDeviceToDevice); // copy corners and sides to Anew
     catchFailure("copy A to Anew");
     dim3 threads(32, 32, 1);
     dim3 blocks(netSize/32, netSize/32, 1);
-
+    if(netSize % 32 != 0) {
+        blocks.x += 1;
+        blocks.y += 1;
+    }
     double* val;
     cudaMalloc((void**)&val, sizeof(double));
 
@@ -137,15 +143,14 @@ int main(int argc, char* argv[]) {
 
     CubDebugExit(DeviceReduce::Max(d_temp_storage, temp_storage_bytes, Delta, val, size));
     CubDebugExit(g_allocator.DeviceAllocate(&d_temp_storage, temp_storage_bytes));
-    std::cout << "hello" << std::endl;
     for(itCount = 0; itCount < itCountMax; itCount++)
     {
         solve<<<blocks, threads>>>(A, Anew, netSize);
-        //catchFailure("solve");
+        catchFailure("solve");
         if(itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
 
             getDelta<<<size/1024, 1024>>>(Anew, A, Delta);
-            //catchFailure("delta");
+            catchFailure("delta");
             // Run
             CubDebugExit(DeviceReduce::Max(d_temp_storage, temp_storage_bytes, Delta, val, size));
             

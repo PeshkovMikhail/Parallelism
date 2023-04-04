@@ -87,14 +87,16 @@ __global__ void solve(const double *A, double *Anew, unsigned long long netSize)
 {
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
     unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
-    if(x == 0 || y == 0 || x == netSize -1 || y == netSize -1)
+    if(x == 0 || y == 0 || x >= netSize -1 || y >= netSize -1)
         return;
     Anew[y*netSize + x] = 0.25 * (A[(y+1)*netSize + x] + A[(y-1)*netSize + x] + A[y*netSize + x + 1] + A[y*netSize + x - 1]);
 }
 
-__global__ void getDelta(double* Anew, double* A, double* Delta)
+__global__ void getDelta(double* Anew, double* A, double* Delta, int size)
 {
     unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
+    if(x >= size)
+        return;
     Delta[x] = Anew[x] - A[x];
 }
 
@@ -146,11 +148,11 @@ int main(int argc, char* argv[]) {
     for(itCount = 0; itCount < itCountMax; itCount++)
     {
         solve<<<blocks, threads>>>(A, Anew, netSize);
-        catchFailure("solve");
         if(itCount%100 == 0 || itCount + 1 == itCountMax) { // calc loss every 100 iterations or last
-
-            getDelta<<<size/1024, 1024>>>(Anew, A, Delta);
-            catchFailure("delta");
+            int delta_blocks = size/1024;
+            if(size%1024!=0)
+                delta_blocks+=1;
+            getDelta<<<delta_blocks, 1024>>>(Anew, A, Delta, size);
             // Run
             CubDebugExit(DeviceReduce::Max(d_temp_storage, temp_storage_bytes, Delta, val, size));
             
@@ -163,6 +165,17 @@ int main(int argc, char* argv[]) {
                 break;
         }
         std::swap(A, Anew); // swap pointers on cpu
+    }
+    catchFailure("calc");
+    if(netSize <= 32){
+        double* results = new double[size];
+        cudaMemcpy(results, A, sizeof(double)*size, cudaMemcpyDeviceToHost);
+        for(int y = 0; y < netSize; y++){
+            for(int x = 0; x < netSize; x++) {
+                std::cout << results[y*netSize + x] << " ";
+            }
+            std::cout << std::endl;
+        }
     }
     catchFailure("calc fail");
     std::cout << loss << '\n';

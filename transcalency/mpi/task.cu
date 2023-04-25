@@ -134,13 +134,11 @@ void shareLimits(double* A, Context ctx)
 {
     if (ctx.rank!=ctx.count -1)
     {
-        MPI_Isend(&A[(ctx.height.self-2)*ctx.netSize],ctx.netSize,MPI_DOUBLE,ctx.rank+1,0,MPI_COMM_WORLD);
-        MPI_Recv(&A[(ctx.height.self-1)*ctx.netSize],ctx.netSize,MPI_DOUBLE,ctx.rank+1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+        MPI_Sendrecv(&A[(ctx.height.self-2)*ctx.netSize], ctx.netSize,MPI_DOUBLE,ctx.rank+1,0, &A[(ctx.height.self-1)*ctx.netSize], ctx.netSize,MPI_DOUBLE,ctx.rank+1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
     if (ctx.rank!=0)
     {
-        MPI_Isend(&A[ctx.netSize],ctx.netSize,MPI_DOUBLE,ctx.rank-1,0,MPI_COMM_WORLD);
-        MPI_Recv(A,ctx.netSize,MPI_DOUBLE,ctx.rank-1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+        MPI_Sendrecv(&A[ctx.netSize],ctx.netSize,MPI_DOUBLE,ctx.rank-1,0, A,ctx.netSize,MPI_DOUBLE,ctx.rank-1,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
     }
 }
 
@@ -376,7 +374,6 @@ int main(int argc, char* argv[]) {
     {
         // пересылка граничных условий
         shareLimits(A, ctx);
-        
         // пятиточечный алгоритм
         solve<<<blocks, threads>>>(A, Anew, netSize, ctx.height.self);
         cudaDeviceSynchronize();

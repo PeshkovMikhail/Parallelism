@@ -3,22 +3,22 @@ import torch.nn as nn
 import numpy as np
 
 import os
+
+
 class Net(nn.Module):
 
     def __init__(self):
+        super(Net, self).__init__()
 
-         super(Net, self).__init__()
+        self.fc1 = nn.Linear(32 ** 2, 16 ** 2)  # входной слой
 
-         self.fc1 = nn.Linear(32**2, 16**2) # входной слой
+        self.fc2 = nn.Linear(16 ** 2, 4 ** 2)  # скрытый слой
 
-         self.fc2 = nn.Linear(16**2, 4**2) # скрытый слой
+        self.fc3 = nn.Linear(4 ** 2, 1)  # скрытый слой
 
-         self.fc3 = nn.Linear(4 ** 2,1) # скрытый слой
-
-# прямое распространение информации
+    # прямое распространение информации
 
     def forward(self, x):
-
         sigmoid = nn.Sigmoid()
 
         x = sigmoid(self.fc1(x))
@@ -30,17 +30,14 @@ class Net(nn.Module):
         return x
 
 
+inputs = torch.rand(32 ** 2)  # входные данные нейронной сети
 
-
-
-inputs = torch.rand(32**2) # входные данные нейронной сети
-
-net = Net() # создание объекта "нейронная сеть"
+net = Net()  # создание объекта "нейронная сеть"
 print(net.fc1.weight.detach().numpy().dtype)
 
-result = net(inputs) # запуск прямого распространения информации
+result = net(inputs)  # запуск прямого распространения информации
 
-print(result)
+print(result.detach().numpy()[0])
 
 if not os.path.exists("weights/"):
     os.mkdir("weights")

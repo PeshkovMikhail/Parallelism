@@ -117,17 +117,11 @@ public:
             throw std::runtime_error("wrong argument");
         float alpha = 1, beta = 1;
 
-        std::cout << b.shape()[0] << " " << b.shape()[1] << std::endl;
         cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
                     (int)a.shape()[0], (int)b.shape()[0],(int)a.shape()[1],
                     &alpha, a._data, 1,
                     b._data, (int)b.shape()[0],
                     &beta, res._data, 1);
-//        cublasSgemm(handle, CUBLAS_OP_N,CUBLAS_OP_N,
-//                    1,out_x.size(),in_x.size(),
-//                    &alpha,in_x.data(),1,
-//                    weights.data(),in_x.size(),
-//                    &beta,out_x.data(),1);
         return res;
     }
 
@@ -248,6 +242,7 @@ int main() {
 
     float t;
     cudaMemcpy(&t, out.data_ptr(), sizeof(float), cudaMemcpyDeviceToHost);
+    std::cout.precision(8);
     std::cout << t << std::endl;
 
     return 0;
